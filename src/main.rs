@@ -8,7 +8,19 @@ use tokio;
 // struct User {
 //    email: String,
 //  password: String,
+//
 //}
+
+fn get_user_input() -> String {
+    let mut input = String::new(); 
+    io::stdout().flush().expect("Failed to flush");
+    io::stdin()
+        .read_line(&mut input)
+        .expect("error unable to read user");
+    trim_newline(&mut input);
+    input
+
+}
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
@@ -20,30 +32,15 @@ async fn main() -> Result<(), reqwest::Error> {
 
     match matches.subcommand() {
         ("login", Some(sub_m)) => {
-            let mut site = String::new();
             print!("Site: ");
-            io::stdout().flush().expect("Failed to flush");
-            io::stdin()
-                .read_line(&mut site)
-                .expect("error unable to read user");
-            trim_newline(&mut site);
-
-            let mut username = String::new();
+            let site = get_user_input();
+            
             print!("username: ");
-            io::stdout().flush().expect("Failed to flush");
-            io::stdin()
-                .read_line(&mut username)
-                .expect("error unable to read user");
-            trim_newline(&mut username);
-            println!("this is user {:?}", username);
-
-            let mut password = String::new();
+            let username = get_user_input();
+            
             print!("password: ");
-            io::stdout().flush().expect("Failed to flush?");
-            io::stdin()
-                .read_line(&mut password)
-                .expect("error unable to read user");
-            trim_newline(&mut password);
+            let password = get_user_input();
+
             let merge = [username, ":".to_owned(), password].join("");
             println!("merge {:?}", merge);
             let encoded = encode(merge);
