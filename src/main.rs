@@ -1,25 +1,55 @@
 use base64::encode;
 use clap::{App, Arg, SubCommand};
 use reqwest;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use tokio;
 
-// struct User {
-//    email: String,
-//  password: String,
-//
-//}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct JiraBoardLocation {
+    project_id: u64,
+    display_name: String,
+    project_name: String,
+    project_key: String,
+    project_type_key: String,
+    #[serde(alias = "avatarURI")]
+    avatar_uri: String,
+    name: String,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct JiraBoardValues {
+    id: u32,
+    #[serde(rename = "self")]
+    self_type: String,
+    name: String,
+    #[serde(alias = "type")]
+    type_name: String,
+    location: JiraBoardLocation,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct JiraBoard {
+    max_results: u32,
+    start_at: u32,
+    total: u32,
+    is_last: bool,
+    values: Vec<JiraBoardValues>,
+}
 
 fn get_user_input() -> String {
-    let mut input = String::new(); 
+    let mut input = String::new();
     io::stdout().flush().expect("Failed to flush");
     io::stdin()
         .read_line(&mut input)
-        .expect("error unable to read user");
+        .expect("error unable to read input");
     trim_newline(&mut input);
     input
-
 }
 
 #[tokio::main]
@@ -34,10 +64,10 @@ async fn main() -> Result<(), reqwest::Error> {
         ("login", Some(sub_m)) => {
             print!("Site: ");
             let site = get_user_input();
-            
+
             print!("username: ");
             let username = get_user_input();
-            
+
             print!("password: ");
             let password = get_user_input();
 
@@ -53,10 +83,13 @@ async fn main() -> Result<(), reqwest::Error> {
                 )
                 .header(reqwest::header::CONTENT_TYPE, "application/json")
                 .send()
+                .await?
+                .text()
                 .await?;
-            //let json = res.json().await?;
-            println!("{:?}", res.text().await?);
-            println!("{:?}", encoded);
+            let deserialize_jiraboard =
+                serde_json::from_str::<JiraBoard>(&res).expect("failed to deserialize json");
+
+            println!("{:?}", deserialize_jiraboard);
         }
         (command, _) => unreachable!("invalid subcommand: {}", command),
     }
