@@ -77,30 +77,25 @@ async fn config() -> Result<(), reqwest::Error> {
 }
 
 async fn get_jira_board() -> Result<(), reqwest::Error> {
-    //let res = get_client_request(("/rest/agile/1.0/board", username, password).await?;
-    //let deserialize_jiraboard =
-    //serde_json::from_str::<JiraBoard>(&res).expect("failed to deserialize json");
+    let res = get_client_request("/rest/agile/1.0/board").await?; 
+    let deserialized = serde_json::from_str::<JiraBoard>(&res).expect("failed to deserialize json");
 
-    //println!("{:?}", deserialize_jiraboard);
+    println!("{:?}", deserialized);
     Ok(())
 }
 
-async fn get_client_request(
-    endpoint: String,
-    username: String,
-    password: String,
-) -> Result<reqwest::Client, reqwest::Error> {
+async fn get_client_request(endpoint: &str) -> Result<String, reqwest::Error> {
+    let config = read_config().expect("Expected to read config");
     let client = reqwest::Client::new();
-    let site = String::new();
-    client
-        .get(site + &endpoint)
-        .basic_auth(username, Some(password))
+    let res = client
+        .get(config.site + &endpoint)
+        .basic_auth(config.username, Some(config.password))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .send()
         .await?
         .text()
         .await?;
-    Ok(client)
+    Ok(res)
 }
 
 fn create_config(site: String, username: String, password: String) -> std::io::Result<()> {
@@ -152,9 +147,11 @@ async fn main() -> Result<(), reqwest::Error> {
         .version("0.01")
         .author("James Dunn")
         .subcommand(SubCommand::with_name("config").about("setup config to login to jira"))
+        .subcommand(SubCommand::with_name("board").about("Retrieve jira board"))
         .get_matches();
 
     match matches.subcommand() {
+        ("board", Some(_)) => get_jira_board().await?,
         ("config", Some(_)) => config().await?,
         (command, _) => unreachable!("invalid subcommand: {}", command),
     }
