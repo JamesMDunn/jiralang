@@ -1,10 +1,13 @@
-use base64::encode;
 use clap::{App, Arg, SubCommand};
+use dirs;
+use ini::Ini;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
+use std::fs::File;
 use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 use tokio;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -41,6 +44,12 @@ struct JiraBoard {
     values: Vec<JiraBoardValues>,
 }
 
+struct User {
+    site: String,
+    username: String,
+    password: String,
+}
+
 fn get_user_input() -> String {
     let mut input = String::new();
     io::stdout().flush().expect("Failed to flush");
@@ -51,7 +60,7 @@ fn get_user_input() -> String {
     input
 }
 
-async fn login() -> Result<(), reqwest::Error> {
+async fn config() -> Result<(), reqwest::Error> {
     print!("Site: ");
     let site = get_user_input();
 
@@ -60,26 +69,61 @@ async fn login() -> Result<(), reqwest::Error> {
 
     print!("password: ");
     let password = get_user_input();
+    create_config(site, username, password).expect("Failed to create config");
 
-    let merge = [username, ":".to_owned(), password].join("");
-    println!("merge {:?}", merge);
-    let encoded = encode(merge);
+    Ok(())
+}
+
+async fn get_jira_board() -> Result<(), reqwest::Error> {
+    //let res = get_client_request(("/rest/agile/1.0/board", username, password).await?;
+    //let deserialize_jiraboard =
+    //serde_json::from_str::<JiraBoard>(&res).expect("failed to deserialize json");
+
+    //println!("{:?}", deserialize_jiraboard);
+    Ok(())
+}
+
+async fn get_client_request(
+    endpoint: String,
+    username: String,
+    password: String,
+) -> Result<reqwest::Client, reqwest::Error> {
     let client = reqwest::Client::new();
-    let res = client
-        .get(site + "/rest/agile/1.0/board")
-        .header(
-            reqwest::header::AUTHORIZATION,
-            "Basic ".to_owned() + &encoded,
-        )
+    let site = String::new();
+    client
+        .get(site + &endpoint)
+        .basic_auth(username, Some(password))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .send()
         .await?
         .text()
         .await?;
-    let deserialize_jiraboard =
-        serde_json::from_str::<JiraBoard>(&res).expect("failed to deserialize json");
+    Ok(client)
+}
 
-    println!("{:?}", deserialize_jiraboard);
+fn create_config(site: String, username: String, password: String) -> std::io::Result<()> {
+    let mut file_path = get_config_path();
+    println!("file path is {:?}", file_path);
+    let mut conf = Ini::new();
+    conf.with_section(
+        Some("Config"))
+            .set("site", site)
+            .set("username", username)
+            .set("password", password);
+    conf.write_to_file(file_path)?;
+    Ok(())
+}
+
+fn get_config_path() -> PathBuf {
+    let mut home_path = dirs::home_dir().expect("Expected a home path");
+    home_path.push(".jiralang");
+    home_path
+}
+
+fn read_config() -> std::io::Result<()> {
+    let mut home_path = get_config_path();
+    let mut file = File::open(home_path.as_path())?;
+    println!("{:?}", file);
     Ok(())
 }
 
@@ -88,13 +132,11 @@ async fn main() -> Result<(), reqwest::Error> {
     let matches = App::new("Jiralang program")
         .version("0.01")
         .author("James Dunn")
-        .subcommand(SubCommand::with_name("login").about("Login to jira"))
+        .subcommand(SubCommand::with_name("config").about("setup config to login to jira"))
         .get_matches();
 
     match matches.subcommand() {
-        ("login", Some(_)) => {
-            login().await?;
-        }
+        ("config", Some(_)) => config().await?,
         (command, _) => unreachable!("invalid subcommand: {}", command),
     }
     Ok(())
