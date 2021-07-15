@@ -44,7 +44,8 @@ struct JiraBoard {
     values: Vec<JiraBoardValues>,
 }
 
-struct User {
+#[derive(Debug)]
+struct Config {
     site: String,
     username: String,
     password: String,
@@ -70,7 +71,8 @@ async fn config() -> Result<(), reqwest::Error> {
     print!("password: ");
     let password = get_user_input();
     create_config(site, username, password).expect("Failed to create config");
-
+    let conf = read_config().expect("tried to read config");
+    println!("{:?} this is your config", conf);
     Ok(())
 }
 
@@ -102,14 +104,13 @@ async fn get_client_request(
 }
 
 fn create_config(site: String, username: String, password: String) -> std::io::Result<()> {
-    let mut file_path = get_config_path();
+    let file_path = get_config_path();
     println!("file path is {:?}", file_path);
     let mut conf = Ini::new();
-    conf.with_section(
-        Some("Config"))
-            .set("site", site)
-            .set("username", username)
-            .set("password", password);
+    conf.with_section(Some("Config"))
+        .set("site", site)
+        .set("username", username)
+        .set("password", password);
     conf.write_to_file(file_path)?;
     Ok(())
 }
@@ -120,11 +121,29 @@ fn get_config_path() -> PathBuf {
     home_path
 }
 
-fn read_config() -> std::io::Result<()> {
-    let mut home_path = get_config_path();
-    let mut file = File::open(home_path.as_path())?;
-    println!("{:?}", file);
-    Ok(())
+fn read_config() -> Result<Config, ini::Error> {
+    let file_path = get_config_path();
+    let conf = Ini::load_from_file(file_path)?;
+    let config_section = conf
+        .section(Some("Config"))
+        .expect("Expected to have config section");
+    let site = config_section
+        .get("site")
+        .expect("expected to have property site")
+        .to_owned();
+    let username = config_section
+        .get("username")
+        .expect("expected to have property username")
+        .to_owned();
+    let password = config_section
+        .get("password")
+        .expect("expected to have property password")
+        .to_owned();
+    Ok(Config {
+        site,
+        username,
+        password,
+    })
 }
 
 #[tokio::main]
