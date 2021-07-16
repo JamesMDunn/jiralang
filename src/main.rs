@@ -1,6 +1,7 @@
 use clap::{App, Arg, SubCommand};
 use dirs;
 use ini::Ini;
+use prettytable::{row, Cell, Row, Table};
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -200,11 +201,22 @@ fn read_config() -> Result<Config, ini::Error> {
 
 async fn get_projects() -> Result<(), reqwest::Error> {
     let res = get_client_request("/rest/api/3/project/search").await?;
-    println!("this is data {:?}", res);
-    let deserialize = serde_json::from_str::<Project>(&res).expect("Failed to deserialize data");
+    let projects = serde_json::from_str::<Project>(&res).expect("Failed to deserialize data");
 
-    println!("{:?}", deserialize);
-
+    let mut table = Table::new();
+    table.add_row(Row::new(vec![
+        Cell::new("ID"),
+        Cell::new("Name"),
+        Cell::new("View"),
+    ]));
+    for proj in projects.values {
+        table.add_row(Row::new(vec![
+            Cell::new(&proj.id),
+            Cell::new(&proj.name),
+            Cell::new(&proj.self_url),
+        ]));
+    }
+    table.printstd();
     Ok(())
 }
 
