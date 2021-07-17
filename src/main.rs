@@ -1,13 +1,11 @@
 use clap::{App, Arg, SubCommand};
-use dirs;
-use ini::Ini;
-use prettytable::{row, Cell, Row, Table};
+use prettytable::{Cell, Row, Table};
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::io::{self, Write};
-use std::path::PathBuf;
 use tokio;
+mod config;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -41,13 +39,6 @@ struct JiraBoard {
     total: u32,
     is_last: bool,
     values: Vec<JiraBoardValues>,
-}
-
-#[derive(Debug)]
-struct Config {
-    site: String,
-    username: String,
-    password: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -128,8 +119,8 @@ async fn config() -> Result<(), reqwest::Error> {
 
     print!("password: ");
     let password = get_user_input();
-    create_config(site, username, password).expect("Failed to create config");
-    let conf = read_config().expect("tried to read config");
+    config::create_config(site, username, password).expect("Failed to create config");
+    let conf = config::read_config().expect("tried to read config");
     println!("{:?} this is your config", conf);
     Ok(())
 }
@@ -143,7 +134,7 @@ async fn get_jira_board() -> Result<(), reqwest::Error> {
 }
 
 async fn get_client_request(endpoint: &str) -> Result<String, reqwest::Error> {
-    let config = read_config().expect("Expected to read config");
+    let config = config::read_config().expect("Expected to read config");
     let client = reqwest::Client::new();
     let res = client
         .get(config.site + &endpoint)
@@ -154,49 +145,6 @@ async fn get_client_request(endpoint: &str) -> Result<String, reqwest::Error> {
         .text()
         .await?;
     Ok(res)
-}
-
-fn create_config(site: String, username: String, password: String) -> std::io::Result<()> {
-    let file_path = get_config_path();
-    println!("file path is {:?}", file_path);
-    let mut conf = Ini::new();
-    conf.with_section(Some("Config"))
-        .set("site", site)
-        .set("username", username)
-        .set("password", password);
-    conf.write_to_file(file_path)?;
-    Ok(())
-}
-
-fn get_config_path() -> PathBuf {
-    let mut home_path = dirs::home_dir().expect("Expected a home path");
-    home_path.push(".jiralang");
-    home_path
-}
-
-fn read_config() -> Result<Config, ini::Error> {
-    let file_path = get_config_path();
-    let conf = Ini::load_from_file(file_path)?;
-    let config_section = conf
-        .section(Some("Config"))
-        .expect("Expected to have config section");
-    let site = config_section
-        .get("site")
-        .expect("expected to have property site")
-        .to_owned();
-    let username = config_section
-        .get("username")
-        .expect("expected to have property username")
-        .to_owned();
-    let password = config_section
-        .get("password")
-        .expect("expected to have property password")
-        .to_owned();
-    Ok(Config {
-        site,
-        username,
-        password,
-    })
 }
 
 async fn get_projects() -> Result<(), reqwest::Error> {
